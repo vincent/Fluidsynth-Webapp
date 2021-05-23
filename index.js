@@ -31,6 +31,14 @@ function changeinst(channel,inst,fontId, bank) {
     });
 }
 
+function changefont(font) {
+  var flcmd = 'load "'+font+'"';
+  console.log("fluidsynth: ", flcmd);
+  tconnect.send(flcmd, function(err, response) {
+     // console.log(response);
+  });
+}
+
 function currentinstruments() {
       var current;
       tconnect.send('channels', function(err, chans) {
@@ -52,6 +60,19 @@ function telnetConnect(){
     io.emit('status','connected');
   });
 }
+
+/*************************************************** */
+
+var fontsRefresh;
+function getfonts(client) {
+  clearTimeout(fontsRefresh);
+  tconnect.send('fonts', function (data) {
+    var fonts = data.split("\n").slice(1).map(line => line.split('  ')[1].trim());
+    client.emit('fonts', fonts);
+    fontsRefresh = setTimeout(getfonts, config.STATUS_UPDATE_INTERVAL);
+  });
+}
+
 var voices;
 function getvoices(client) {
   clearTimeout(voices);
@@ -61,11 +82,15 @@ function getvoices(client) {
     voices = setTimeout(getvoices, config.STATUS_UPDATE_INTERVAL);
   });
 }
+
 function dumpInstruments(font,client){
   tconnect.send('inst '+font, function(err, ins) {
     client.emit('instrumentdump', { package: ins });
   });
 }
+
+/*************************************************** */
+
 io.on('connection', function(client) {
     console.log('server connected');
     telnetConnect();
@@ -76,39 +101,43 @@ io.on('connection', function(client) {
     });
 
     client.on('queryFont',function(font){
-
       if (isNumeric(font)){
         dumpInstruments(font,client);
       }
-
     });
 
-    client.on('changeinst', function(data) {
-      
+    client.on('changefont', function(data) {
+      changefont(data.font)
+    });
+
+    client.on('changeinst', function(data) {      
       var channel = data.channel;
       var inst = data.instrumentId;
       var fontId = data.fontId;
       var bankId = data.bankId;
 
       if ( isNumeric(channel) && isNumeric(inst) ) {
-
         changeinst(channel,inst,fontId,bankId);
       } 
     });
+
     client.on('getinstruments', function(){
         tconnect.send('channels', function(err, ins) {
-	  var raw_list = ins.split("\n");
-	  var channel_list = [];
-	  for (i=0; i < raw_list.length - 1; i++){
-	    channel_list[i] = raw_list[i].split(", ")[1].trim();
-	  }
+          var raw_list = ins.split("\n");
+          var channel_list = [];
+          for (i=0; i < raw_list.length - 1; i++){
+            channel_list[i] = raw_list[i].split(", ")[1].trim();
+          }
           io.emit('current', { channels: channel_list });
         });
     });
-    // getvoices(client);
 
+    getfonts(client);
+    // getvoices(client);
 });
+
 io.on('error', function(error) {
   console.log(error);
 });
+
 server.listen(7000);

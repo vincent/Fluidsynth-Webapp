@@ -1,6 +1,6 @@
 var server = self.location.host;
 var socket = io.connect('http://' + server);
-var instruments;
+var instruments, fonts;
 
 var channel = 15;
 var listFont = 1;
@@ -18,6 +18,10 @@ function getChannels(){
 	socket.on('current', function(data){
 		instruments = data.channels;
 		console.log(instruments);
+	});
+	socket.on('fonts', function(data){
+		fonts = data;
+		console.log(fonts);
 	});
 }
 
@@ -41,6 +45,16 @@ function getInstruments(){
 	socket.on('instrumentdump', function(idmp){
 
 		$('#instruments').html("");
+
+		for (i=0;i < fonts.length - 1; i++) {
+			$('#instruments').append(
+				'<li data-icon="audio"><a href="#" data-font="' 
+				+ fonts[i] 
+				+ '" >' 
+				+ fonts[i]  
+				+ '</a></li>').enhanceWithin();
+		}
+
 		var str = idmp.package;
 		var array = ["coso1", "coso2", "coso3"];
 		var instruments = str.split("\n");
@@ -60,11 +74,12 @@ function getInstruments(){
 				+ instrumentname 
 				+ '</a></li>').enhanceWithin();
 		}
-		$("#instruments").listview("refresh");
+
+		$("#instruments").listview().listview("refresh");
 		$.mobile.loading( 'hide');
 	});
 }
-$(document).on('vclick', '#instruments li a', function(){
+$(document).on('vclick', '#instruments li a[data-inum]', function(){
 	var ipath = $(this).attr('data-inum');
 	var fontId = $(this).attr('data-font-id');
 	var instBank = $(this).attr('data-inst-bank');
@@ -79,6 +94,14 @@ $(document).on('vclick', '#instruments li a', function(){
 
 	console.log(channel);
 	console.log(ipath);
+	$('#instruments li a').removeClass('ui-btn-active');
+	$(this).addClass('ui-btn-active');
+});
+
+$(document).on('vclick', '#instruments li a[data-font]', function(){
+	var font = $(this).attr('data-font');
+	socket.emit('changeinst', { font });
+
 	$('#instruments li a').removeClass('ui-btn-active');
 	$(this).addClass('ui-btn-active');
 });
