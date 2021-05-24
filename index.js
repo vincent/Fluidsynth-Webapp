@@ -32,7 +32,7 @@ function changeinst(channel,inst,fontId, bank) {
 }
 
 function changefont(font) {
-  var flcmd = 'load "'+font+'"';
+  var flcmd = 'load "' + font + '"';
   console.log("fluidsynth: ", flcmd);
   tconnect.send(flcmd, function(err, response) {
      // console.log(response);
@@ -63,13 +63,18 @@ function telnetConnect(){
 
 /*************************************************** */
 
-var fontsRefresh;
 function getfonts(client) {
-  clearTimeout(fontsRefresh);
-  tconnect.send('fonts', function (data) {
-    var fonts = data.split("\n").slice(1).map(line => line.split('  ')[1].trim());
-    client.emit('fonts', fonts);
-    fontsRefresh = setTimeout(getfonts, config.STATUS_UPDATE_INTERVAL);
+  tconnect.send('fonts', function (err, data) {
+    var fonts = [];
+    if (data) {
+      fonts = data.split("\n")
+         .filter(s => s.match(/^.*sf2$/))
+         .map(line => line.split("  ")[1].trim())
+         .reduce((acc, f) => ({ ...acc, [f]: true }), {});
+    }
+    fonts = Object.keys(fonts);
+    console.log('sending fonts', fonts);
+    client.emit('fonts', { fonts });
   });
 }
 
@@ -132,6 +137,7 @@ io.on('connection', function(client) {
         });
     });
 
+    client.on('getfonts', _ => getfonts(client));
     getfonts(client);
     // getvoices(client);
 });
@@ -140,4 +146,4 @@ io.on('error', function(error) {
   console.log(error);
 });
 
-server.listen(7000);
+server.listen(80);
